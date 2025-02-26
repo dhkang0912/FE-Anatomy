@@ -6,10 +6,18 @@
     - [2-1. 리액트의 렌더링이란 무엇인가?](#2-1-리액트의-렌더링이란-무엇인가)
       - [(1) 전체적인 렌더링 과정](#1-전체적인-렌더링-과정)
     - [2-2. 렌더와 커밋 단계](#2-2-렌더와-커밋-단계)
+      - [(1) React Element (리액트 엘리먼트)](#1-react-element-리액트-엘리먼트)
+      - [(2) 컴포넌트 트리 (Component Tree)](#2-컴포넌트-트리-component-tree)
+      - [(3) Virtual DOM (가상 DOM)](#3-virtual-dom-가상-dom)
+      - [(4) Fiber 트리 (Fiber Tree)](#4-fiber-트리-fiber-tree)
+      - [(5) 실제 DOM 업데이터 (Commit 단계)](#5-실제-dom-업데이터-commit-단계)
+      - [(6) 한 줄 요약](#6-한-줄-요약)
     - [2-3. React는 렌더를 어떻게 다룰까?](#2-3-react는-렌더를-어떻게-다룰까)
       - [1. 렌더링 순서 만들기](#1-렌더링-순서-만들기)
       - [2. 표준적인 렌더 동작](#2-표준적인-렌더-동작)
       - [3. React의 렌더링 규칙](#3-react의-렌더링-규칙)
+      - [4. 컴포넌트 메타데이터와 Fibers](#4-컴포넌트-메타데이터와-fibers)
+      - [5. 컴포넌트 타입과 재조정 (Reconciliation)](#5-컴포넌트-타입과-재조정-reconciliation)
   - [참고 자료](#참고-자료)
 
 # 리액트 렌더링 과정
@@ -110,7 +118,7 @@
 
 <br>
 
-- 전체 컴포넌트 트리에서 렌더 결과물을 모두 수집하면 **재조정(Reconciliation)**을 진행
+- 전체 컴포넌트 트리에서 렌더 결과물을 모두 수집하면 **재조정(Reconciliation)** 을 진행
   - 재조정 : 새로운 객체 트리(Virtual DOM, Value UI)와 비교하여 의도한대로 보여지기 위한 실제 DOM에 적용시켜야 할 모든 변경사항을 수집하며 비교 및 계산 과정을 거침
 - 이후 계산된 모든 변경사항을 하나의 동기적 시퀀스(synchoronous sequence)로 실제 DOM에 적용시킴
 
@@ -140,6 +148,110 @@
        - `Concurrent Mode` : 렌더링을 백그라운드에서 여러번 실행할 수 있음 (createRoot()를 통해 설정 가능)  
         => 화면을 그리면서도 더 나은 렌더링을 미리 계산하는 기능이 존재
        - 위 기능을 통해 화면을 그리는 중이더라도 현재 렌더링을 취소하고 새로운 업데이트 요소를 반영한 렌더링을 시작할 수 있음
+
+<details open>
+<summary>
+&nbsp <mark><b>리액트 전체 렌더링 과정 요약</b></mark>
+</summary>
+
+#### (1) React Element (리액트 엘리먼트)
+- 리액트에서 `가장 기본적인 단위`
+- 컴포넌트가 반환하는 UI의 형태를 표현하는 단순한 불변 **객체**
+  - 단순한 객체로 부모-자식 관계 같은 구조적 정보가 없음
+  - JSX를 JavaScript 객체로 변환한 것
+- 어떤 요소를 렌더링할 것인지 확인한 것
+  - UI를 어떻게 그릴지 설명하는 **설계도**와 같은 역할
+  > 예시 
+  > ```JS
+  > // 다음과 같은 JSX 문법이:
+  > return <SomeComponent a={42} b="testing">Text here</SomeComponent>
+  >
+  > // 이런 식의 호출로 변환됩니다:
+  > return React.createElement(SomeComponent, {a: 42, b: "testing"}, "Text Here")
+  > 
+  > // 그렇게해서 이런 리액트 엘리먼트 객체가 됩니다:
+  > {type: SomeComponent, props: {a: 42, b: "testing"}, children: ["Text Here"]}
+  > `
+
+#### (2) 컴포넌트 트리 (Component Tree)
+- 리액트의 컴포넌트 계층 구조 `(부모-자식 관계 표현)`
+  - React Element들을 부모-자식 관계로 정리한 구조
+- 리액트는 이를 기반으로 Virtual DOM을 생성 
+- 컴포넌트 트리는 컴포넌트 간의 관계만을 표현하며 UI의 구체적인 정보는 없음
+  - State나 DOM 업데이트 정보는 없음
+
+  > 예시
+  > ```JS
+  > function App() {
+  > return (
+  >   <div>
+  >     <Header />
+  >     <Main />
+  >     <Footer />
+  >   </div>
+  > );
+  > }
+  > 
+  > ```
+  > 컴포넌트 트리 구조
+  > ```JS
+  >   App
+  > ├── Header
+  > ├── Main
+  > └── Footer
+  > 
+  > ```
+
+#### (3) Virtual DOM (가상 DOM)
+- Virtual DOM : React의 UI 상태를 나타내는 가상의 DOM 
+  - UI를 그릴 요소 + Props 정보
+- React Element를 트리 구조로 합성하여 `UI 구조`를 표현한 것
+- 각 노드는 React Element를 포함하여 부모-자식 관계가 정의됨 (단순 UI)
+  - 컴포넌트 트리의 부모-자식 관계가 반영됨 
+
+#### (4) Fiber 트리 (Fiber Tree)
+- 리액트가 `렌더링을 최적화`하기 위해 사용
+- 각 컴포넌트의 상태(State), 업데이트 정보, 부모-자식 관계 등을 포함
+- 리액트는 `Fiber를 이용해 변경 사항을 감지`하고 최적화된 렌더링을 수행
+- Fiber 트리에서 추가된 정보
+  - 각 컴포넌트의 상태(State), Props, 부모-자식 관계
+  - 이전 렌더링과 비교하기 위한 "alternate" (이전 Fiber 트리 노드)
+  - 최적화된 렌더링을 위한 내부 포인터 구조 (부모, 형제, 자식 요소 연결)
+
+> **Virtual DOM → Fiber 트리 변환** 예시
+> ```JS
+> {
+>  type: "div",
+>  props: { children: [...] },
+>  stateNode: instance, // 클래스 컴포넌트의 경우 인스턴스 저장
+>  memoizedState: { count: 0 }, // useState의 값 저장
+>  child: firstChildFiber, // 첫 번째 자식 요소
+>  sibling: nextSiblingFiber, // 형제 요소
+>  return: parentFiber, // 부모 요소
+>  alternate: previousFiber, // 이전 렌더링의 Fiber (비교용)
+> }
+>```
+
+#### (5) 실제 DOM 업데이터 (Commit 단계)
+- Fiber 트리를 기반으로 변경 사항을 감지하고 실제 DOM에 반영
+- 최소한의 변경만 적용하여 성능 최적화
+> Fiber 트리에서 **변경사항 감지**
+> ```JS
+>{
+>  type: "p",
+>  memoizedState: { count: 1 }, // 새로운 상태
+>  alternate: { count: 0 }, // 이전 상태
+>  effectTag: "UPDATE", // 변경 발생
+>}
+>```
+- `effectTag`가 있는 Fiber만 실제 DOM에 반영
+
+#### (6) 한 줄 요약
+- React Element → 컴포넌트 트리 → Virtual DOM → Fiber 트리 → 실제 DOM 업데이트 순서로 렌더링한다.
+  - 렌더 과정 : React Element → 컴포넌트 트리 → Virtual DOM → Fiber 트리
+  - 커밋 과정 : 실제 DOM 업데이트
+
+</details>
 
 ### 2-3. React는 렌더를 어떻게 다룰까?
 #### 1. 렌더링 순서 만들기
@@ -186,7 +298,7 @@
 >
 > 렌더링 과정은 "**순수 함수(pure function)**"처럼 동작함
 > 
-> 즉, 외부 상태를 변경하지 않고, 같은 입력이 주어지면 **항상 같은 결과**를 반환해야 함.
+> 즉, 외부 상태(현재 컴포넌트 기준)를 변경하지 않고, 같은 입력이 주어지면 **항상 같은 결과**를 반환해야 함.
 - 렌더링 로직은 다음과 같은 행위를 해서는 안됨
   - 현재 존재하는 변수와 객체를 변경하는 행위 => 외부 변수 변경 금지
   - `Math.random()` 또는 `Date.now()` 등의 랜덤 값을 만들어내는 행위 => 매번 다른 결과가 나와 불필요한 리렌더링이 발생할 수 있음
@@ -196,6 +308,212 @@
   - 렌더링 도중 새롭게 만들어진 객체를 변경하는 행위 => 외부 상태를 건드리지 않음
   - 에러를 발생시키는 행위
   - 캐싱된 값처럼 아직 만들어지지 않은 데이터를 "Lazy 초기화"하는 행위
+
+#### 4. 컴포넌트 메타데이터와 Fibers
+- Fiber (피버) : 각 컴포넌트를 관리하는 내부 객체로 검포넌트의 상태, 업데이트 정보, 부모-자식 관계를 연결 리스트로 관리함 (리액트 16부터 사용됨)
+  - Fiber는 리액트의 `핵심 렌더링 엔진`
+    - 어떻게 화면을 그릴지 결정하고 실제 화면에 반영하는 역할
+    - 렌더 단계 : 변경 사항을 계산하는 과정 (Virtual DOM과 비교)
+    - 커밋 단계 : 실제 DOM을 업데이트하는 과정
+
+> **Fiber 트리 구조 예시**
+> ```JS
+>{
+>  type: "div",
+>  props: { children: [...] },
+>   stateNode: instance, // 클래스 컴포넌트의 경우 인스턴스 저장
+>   memoizedState: { count: 0 }, // useState의 값 저장
+>   child: firstChildFiber, // 첫 번째 자식 요소
+>   sibling: nextSiblingFiber, // 형제 요소
+>   return: parentFiber, // 부모 요소
+>   alternate: previousFiber, // 이전 렌더링의 Fiber (비교용)
+> }
+> 
+> ```
+
+<br>
+
+- Fiber 객체(Fiber Node) 정보
+  - 각 Fiber 객체는 `컴포넌트의 메타데이터 (정보)`를 저장함
+  - 컴포넌트의 상태와 업데이트 방식을 관리하는 데이터 구조
+
+    | 정보                       | 설명                                                          |
+    | :------------------------- | :------------------------------------------------------------ |
+    | 컴포넌트 유형              | 이 Fiber가 어떤 컴포넌트인지 (함수형, 클래스형, HTML 태그 등) |
+    | Props & State              | 현재 이 컴포넌트의 Props와 State 값                           |
+    | 부모-형제-자식 포인터	트리 | 구조를 유지하기 위해 부모, 형제, 자식 Fiber를 가리키는 포인터 |
+    | 업데이트 정보              | 이 컴포넌트에서 발생한 변경 사항 (리렌더링 여부)              |
+    | 이전 Fiber 정보            | 이전 렌더링 시 사용했던 Fiber 객체 (변경 사항 비교용)         |
+
+<br>
+
+- Fiber의 동작 방식
+  - React는 컴포넌트를 렌더링할 때 Fiber 트리를 탐색하면서 업데이트를 수행
+  1. 렌더링 단계 (Render Phase)
+     - React가 새로운 Virtual DOM을 생성하고 `Fiber 트리를 순회하며 변경 사항을 계산`
+     - 새로운 Fiber 트리를 만들고 기존 Fiber 트리와 비교하여 업데이트가 필요한 부분을 찾음
+  2. 커밋 단계 (Commit Phase)
+     - 변경된 Fiber만 실제 DOM에 반영
+     - React는 이전 Fiber와 새로운 Fiber를 비교하여 `변경된 부분만 업데이트`
+
+<br>
+
+- Fiber와 클래스형 & 함수형 컴포넌트 차이
+  - 클래스형 컴포넌트에서 Fiber 동작 방식
+    - 클래스형 컴포넌트는 인스턴스(this)를 직접 생성해서 관리함
+    - new Component(props)를 실행하여 컴포넌트의 인스턴스를 만들고 Fiber 객체에 저장
+    > 예시
+    ```JS
+    const instance = new MyComponent(props); // 클래스 인스턴스 생성
+    fiberNode.stateNode = instance; // Fiber가 컴포넌트 인스턴스를 저장
+    ```
+  - 함수형 컴포넌트에서 Fiber 동작 방식
+    - 함수형 컴포넌트는 별도의 인스턴스를 만들지 않음!
+    - 대신, 그냥 `함수 실행(YourComponent(props))을 통해 결과를 반환`
+    - React는 Fiber 트리에 이 함수의 렌더링 결과를 저장
+    > 예시
+    ```JS
+    fiberNode.stateNode = null; // 함수형 컴포넌트는 인스턴스를 가지지 않음
+
+    ```
+    - 대신, Fiber가 훅(useState, useReducer 등)의 상태를 저장함
+    - 훅은 Fiber 내부의 "연결 리스트"로 관리됨
+
+<br>
+
+- Fiber와 React Hooks (훅 관리)
+  - React의 훅(useState, useEffect 등)은 Fiber 내부에서 `연결 리스트`로 관리됨
+  - React가 `함수형 컴포넌트를 렌더링할 때, 이전 Fiber에서 훅 리스트를 가져와 상태를 유지함`
+
+#### 5. 컴포넌트 타입과 재조정 (Reconciliation)
+- 리액트는 기존 존재하는 컴포넌트 트리와 DOM 구조를 최대한 재활용해서 효율적으로 리렌더링하려고 함
+  - 같은 위치에서 같은 유형(Component Type)의 컴포넌트가 유지되는 이유는 Fiber의 비교 방식 덕분
+
+<br>
+
+1. `컴포넌트의 타입(Type)`을 기준으로 비교 (Diffing)
+  - 컴포넌트를 재사용할지, 삭제를 할지 결정할 때 컴포넌트 타입을 우선시 여김
+  - 같은 위치에서 같은 유형의 컴포넌트가 있다면 유지 
+    - 같은 위치에 있고 같은 유형이지만 Props만 업데이트한 경우 -> Props만 업데이트 
+    > 같은 컴포넌트 유지되는 예시
+      ```JS
+      // 같은 컴포넌트 유지
+      function MyComponent({ text }) {
+        return <p>{text}</p>;
+      }
+
+      function App({ isVisible }) {
+        return (
+          <div>
+            {isVisible ? <MyComponent text="Hello" /> : <MyComponent text="World" />}
+          </div>
+        );
+      }
+
+      // 이전 렌더링
+      <MyComponent text="Hello" />
+
+      // 이후 렌더링
+      <MyComponent text="World" />
+
+      ```
+      - `MyComponent`가 같은 위치에 있고 같은 유형이므로 Props만 업데이트
+    
+2. 컴포넌트 타입이 바뀌면 기존 트리를 파괴하고 새로 만듦
+  - 만약 기존 위치에 완전히 다른 컴포넌트가 렌더링되면 React는 트리를 재사용하지 않음
+   - 대신 기존 컴포넌트를 `제거`하고 새로운 컴포넌트를 `생성`함.
+    
+  > 다른 컴포넌트로 변경 → 트리 삭제 & 새로 생성되는 예시
+
+  ```JS
+  function ComponentA() {
+    return <p>A Component</p>;
+  }
+
+  function ComponentB() {
+    return <p>B Component</p>;
+  }
+
+  function App({ isToggled }) {
+    return (
+      <div>
+        {isToggled ? <ComponentA /> : <ComponentB />}
+      </div>
+    );
+  }
+
+  // 이전 렌더링
+  <ComponentA />
+
+  // 이후 렌더링 (isToggled 변경)
+  <ComponentB />
+
+  ```
+  - ComponentA와 ComponentB는 다른 타입이므로 React는 ComponentA를 삭제하고, ComponentB를 새로 만듦
+  - React가 렌더링 최적화를 위해 같은 위치에서 같은 컴포넌트 유형(Type)이 유지됨
+
+3. 클래스형 컴포넌트의 경우 실제 인스턴스를 유지함
+  - 클래스형 컴포넌트에서는 인스턴스(객체)가 생성되므로, 같은 위치에서 같은 컴포넌트가 있으면 인스턴스를 유지함
+  > 클래스형 컴포넌트 인스턴스 유지 예시
+  ```JS
+  class MyComponent extends React.Component {
+    componentDidMount() {
+      console.log("Mounted!");
+    }
+
+    componentDidUpdate() {
+      console.log("Updated!");
+    }
+
+    render() {
+      return <p>{this.props.text}</p>;
+    }
+  }
+
+  function App({ isVisible }) {
+    return (
+      <div>
+        {isVisible ? <MyComponent text="Hello" /> : <MyComponent text="World" />}
+      </div>
+    );
+  }
+
+  // 처음 마운트 시 콘솔 출력
+  Mounted!
+
+  // 이후 Props 변경 시 (text 변경)
+  Updated!
+  ```
+  - 같은 위치에서 같은 타입이면 `this 인스턴스`가 유지되므로 `componentDidUpdate`가 실행됨
+  - 클래스형 컴포넌트의 경우 같은 위치에서 같은 유형이면 인스턴스를 유지하며, Props만 변경
+
+4. 함수형 컴포넌트는 인스턴스가 없지만, 같은 위치면 상태를 유지함
+   - 함수형 컴포넌트는 클래스형처럼 this 인스턴스가 없지만, 같은 위치라면 내부 상태`(useState)`를 유지
+  > 같은 위치라면 `useState` 값 유지 예시
+  ```JS
+  function Counter() {
+    const [count, setCount] = useState(0);
+    return <button onClick={() => setCount(count + 1)}>Count: {count}</button>;
+  }
+
+  function App({ showCounter }) {
+    return (
+      <div>
+        {showCounter ? <Counter /> : <p>Hidden</p>}
+      </div>
+    );
+  }
+
+  // showCounter가 true일 때
+  <Counter /> (count = 0)
+
+  // 사용자가 버튼을 클릭하여 count 증가 → (count = 1)
+  // 이후 showCounter를 false로 변경했다가 다시 true로 변경
+  <Counter /> (count = 1)  // 같은 위치라서 count 상태 유지됨!
+
+  ```
+  - 같은 위치에 같은 유형(Type)이라면 useState 값도 유지됨 
+  - 즉 함수형 컴포넌트는 인스턴스가 없지만 같은 위치에서 렌더링되면 변경된 useState 값도 유지됨!
 
 
 </details>
