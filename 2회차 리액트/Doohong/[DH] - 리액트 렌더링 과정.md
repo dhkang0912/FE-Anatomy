@@ -10,7 +10,7 @@
       - [(1) React Element (리액트 엘리먼트)](#1-react-element-리액트-엘리먼트)
       - [(2) 컴포넌트 트리 (Component Tree)](#2-컴포넌트-트리-component-tree)
       - [(3) Virtual DOM (가상 DOM)](#3-virtual-dom-가상-dom)
-      - [(4) Fiber 트리 (Fiber Tree)](#4-fiber-트리-fiber-tree)
+      - [(4) Fiber 트리 (Fiber Tree, React 16버전 이후)](#4-fiber-트리-fiber-tree-react-16버전-이후)
       - [(5) 실제 DOM 업데이터 (Commit 단계)](#5-실제-dom-업데이터-commit-단계)
       - [(6) 한 줄 요약](#6-한-줄-요약)
     - [2-4. React는 렌더를 어떻게 다룰까?](#2-4-react는-렌더를-어떻게-다룰까)
@@ -211,7 +211,7 @@
 - 각 노드는 React Element를 포함하여 부모-자식 관계가 정의됨 (단순 UI)
   - 컴포넌트 트리의 부모-자식 관계가 반영됨 
 
-#### (4) Fiber 트리 (Fiber Tree)
+#### (4) Fiber 트리 (Fiber Tree, React 16버전 이후)
 - 리액트가 `렌더링을 최적화`하기 위해 사용
 - 각 컴포넌트의 상태(State), 업데이트 정보, 부모-자식 관계 등을 포함
 - 리액트는 `Fiber를 이용해 변경 사항을 감지`하고 최적화된 렌더링을 수행
