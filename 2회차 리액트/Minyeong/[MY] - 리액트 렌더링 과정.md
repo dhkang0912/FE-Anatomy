@@ -15,12 +15,13 @@
 컴포넌트에게 현재 props와 state의 상태에 기반하여 UI를 어떻게 구성할 지 요청하는 과정
 
 ### 1-1. Render Phase (렌더링 단계)
-React가 컴포넌트를 호출하고 업데이트 사항을 파악하는 단계로, 이 과정에서는 실제 DOM을 변경하지 않음음
+React가 컴포넌트를 호출하고 업데이트 사항을 파악하는 단계로, 이 과정에서는 실제 DOM을 변경하지 않음
 
 **1-1-1. 컴포넌트를 호출하여 결과값 계산**  
 - React는 컴포넌트 트리를 순회하며 `classComponentInstance.render()` (클래스형 컴포넌트) 또는 `FunctionComponent()` (함수형 컴포넌트)를 호출
 - 이 호출 결과를 저장하여 새로운 UI 상태를 결정
-- React의 JSX 문법은 내부적으로 `React.createElement()` 호출로 변환되어 최종적으로 **React Element 객체**로 변환됨됨
+- React의 JSX 문법은 내부적으로 `React.createElement()` 호출로 변환되어 최종적으로 **React Element 객체**로 변환됨
+  - js가 컴파일되고 런타임 시점에 호출
 ```
 # React의 JSX 문법
 return <SomeComponent a={42} b="testing">Text here</SomeComponent>
@@ -37,10 +38,6 @@ return React.createElement(SomeComponent, {a: 42, b: "testing"}, "Text Here")
 }
 ```
 
-- 불필요한 렌더링 방지 (최적화)  
-  - React.memo: 동일한 props가 전달될 경우, 이전 결과를 재사용하여 불필요한 렌더링을 방지
-  - useMemo, useCallback: 연산량이 많은 계산이나 함수 재생성을 방지
-
 **1-1-2. Virtual DOM 생성**  
 - React Element 객체들을 모아 Virtual DOM을 구성
 - Virtual DOM은 실제 DOM의 복제판이 아니라 UI 상태를 값으로 표현한 데이터 구조
@@ -56,14 +53,54 @@ return React.createElement(SomeComponent, {a: 42, b: "testing"}, "Text Here")
   - Context API 사용 시, 모든 하위 컴포넌트가 리렌더링되지 않도록 useMemo를 활용
 
 ### 1-2. Commit Phase (커밋 단계)
-Render Phase에서 계산된 변경 사항을 실제 DOM에 반영하는 단계
+Render Phase에서 계산된 변경 사항을 실제 DOM에 반영하는 과정
+
 
 **1-2-1. 변경된 Virtual DOM을 바탕으로 실제 DOM 업데이트**  
-- Render Phase에서 계산한 변경된 Virtual DOM의 차이점(Diffing 결과) 을 기반으로 실제 DOM을 업데이트
-  - 이 과정에서 React는 기존 Virtual DOM을 직접 비교하는 것이 아니라, 이미 Render Phase에서 비교된 결과를 사용하여 효율적으로 변경을 적용
-- React는 batching(배치 업데이트)을 활용하여 여러 개의 업데이트를 한 번에 처리하여 성능을 최적화
-  - React 18부터는 automatic batching이 도입되어, 여러 상태 업데이트를 자동으로 하나로 묶어 처리 가능
-- 브라우저의 렌더링 성능을 향상시키기 위해 requestAnimationFrame을 활용하여 최적의 시점에 DOM 업데이트를 수행 가능
+- Render Phase에서 생성된(변경된) Virtual DOM을 기반으로 실제 DOM을 효율적으로 업데이트
+  - React는 기존 Virtual DOM과 새로운 Virtual DOM을 비교하는 것이 아니라 **이미 Render Phase에서 계산된 변경 사항(Diffing 결과) 만 적용**하여 성능을 최적화함
+- React는 Batching(배치 업데이트) 기법을 사용하여 성능을 최적화
+  - 여러 개의 상태 업데이트를 한 번의 커밋에서 처리하여 불필요한 렌더링을 방지
+  - React 18부터 Automatic Batching이 도입되어 이벤트 핸들러뿐만 아니라 `setTimeout`, `Promise`, 네트워크 요청 등에서도 여러 상태 업데이트를 자동으로 묶어 처리할 수 있음
+- 브라우저 성능 최적화를 위해 requestAnimationFrame 활용 가능
+  - `requestAnimationFrame()` : 브라우저가 다음 화면을 그리기 직전에 실행할 함수를 예약하는 API
+  - React는 필요에 따라 requestAnimationFrame을 사용하여 최적의 시점에 DOM을 업데이트하여 성능을 향상시킴
+  - 이를 통해 불필요한 화면 깜빡임이나 과도한 DOM 변경을 줄일 수 있음
+
+**1-2-2. 커밋 후 참조 업데이트 및 라이프사이클 실행**  
+Commit Phase에서 변경된 Virtual DOM을 실제 DOM에 반영한 후 추가 작업
+
+① 참조 업데이트  
+- ref를 사용해 DOM 노드를 직접 참조하는 경우, 리액트는 새로운 DOM 노드를 가리키도록 자동 업데이트  
+- 클래스 컴포넌트의 this 인스턴스도 변경된 데이터를 반영하여 업데이트
+
+② 라이프사이클 메소드 및 훅 실행  
+- 클래스 컴포넌트 `componentDidMount`, `componentDidUpdate` 실행
+- 함수형 컴포넌트 `useLayoutEffect`가 동기적으로 실행  
+이 단계에서 실행되는 효과는 UI가 브라우저에 표시되기 전에 적용됨
+
+③ Passive Effects (비동기 후처리)  
+- 리액트는 커밋 후 짧은 timeout을 설정한 후 이 timeout이 만료되면 useEffect를 실행
+- useEffect는 브라우저가 화면을 다시 그린 후 실행되므로 UI 업데이트 과정에는 영향을 미치지 않음
+
+**참고 - React 18 Concurrent Mode(동시 모드)의 핵심 개념**  
+- 브라우저가 사용자 이벤트를 원활하게 처리할 수 있도록 렌더링을 조절하는 방식
+
+
+① 렌더링을 일시 중지 및 재개 가능  
+- 기존의 리액트에서는 렌더링이 시작되면 완료될 때까지 중단할 수 없었음
+- Concurrent Mode에서는 렌더링 도중 브라우저가 이벤트를 처리할 필요가 있으면 잠시 멈출 수 있음
+- 이후 다시 이전 상태에서 렌더링을 이어서 진행하거나
+새로운 상태를 반영하여 렌더링을 다시 시작할 수도 있음
+
+② 렌더링 결과가 무효화될 수 있음
+- 리액트는 같은 컴포넌트를 여러 번 렌더링할 수 있음
+- 하지만 렌더링 도중 새로운 상태 업데이트(setState)가 발생하면 현재 진행 중이던 렌더링 결과는 무효화되고 버려짐
+- 즉, 더 이상 사용되지 않을 렌더링 결과는 적용되지 않고 폐기.
+이를 통해 불필요한 연산을 줄이고 성능 최적화 가능
+
+
+![alt text](image.png)
 
 ## 2. React에서 렌더링을 어떻게 다룰까?
 ### 2-1. React의 Reconciliation(재조정)과 Fiber 아키텍처
