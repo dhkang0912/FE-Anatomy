@@ -13,6 +13,20 @@
       - [2. SSR](#2-ssr)
       - [3. SSG](#3-ssg)
       - [4. ISR](#4-isr)
+  - [2. NextJS에서 다양한 렌더링 방식들은 서로 어떤 연관이 있을까? (SSG, SSR, ISR, CSR, Static(Pre), Dynamic) ](#2-nextjs에서-다양한-렌더링-방식들은-서로-어떤-연관이-있을까-ssg-ssr-isr-csr-staticpre-dynamic-)
+    - [(1) 개요](#1-개요)
+    - [(2) SSG 구현 방식](#2-ssg-구현-방식)
+      - [1. Pages 라우터에서 SSG 구현 방식](#1-pages-라우터에서-ssg-구현-방식)
+      - [2. App 라우터에서 SSG 구현 방식](#2-app-라우터에서-ssg-구현-방식)
+    - [(3) SSR 구현 방식](#3-ssr-구현-방식)
+      - [1. Pages 라우터에서 SSR 구현 방식](#1-pages-라우터에서-ssr-구현-방식)
+      - [2. App 라우터에서 SSR 구현 방식](#2-app-라우터에서-ssr-구현-방식)
+    - [(4) CSR \<-\> SSR / SSG, SSR, ISG 맥락에서 SSR 의미](#4-csr---ssr--ssg-ssr-isg-맥락에서-ssr-의미)
+      - [1. CSR \<-\> SSR](#1-csr---ssr)
+      - [2. SSG, SSR, ISG 맥락](#2-ssg-ssr-isg-맥락)
+    - [(5) ISR (Incremental Static Regeneration)](#5-isr-incremental-static-regeneration)
+      - [1. Pages 라우터에서 ISR 구현 방식](#1-pages-라우터에서-isr-구현-방식)
+      - [2. App 라우터에서 ISR 구현 방식](#2-app-라우터에서-isr-구현-방식)
 
 # 넥스트 렌더링 과정
 ## 1. [예제로 알아보는 Next js 렌더링 기법 (CSR, SSR, SSG, ISR)](https://www.youtube.com/watch?v=GswzHF5UpHA)
@@ -247,3 +261,293 @@
 
 <br> <br>
 
+## 2. [NextJS에서 다양한 렌더링 방식들은 서로 어떤 연관이 있을까? (SSG, SSR, ISR, CSR, Static(Pre), Dynamic) ](https://www.youtube.com/watch?v=I2La3ivhX_s)
+
+### (1) 개요
+- 아래 두 상황에서 SSR이 차이점이 있음 : 이름은 같지만 주목하는 바가 달라서 `의미가 다름`
+  - SSG, `SSR`, ISR 
+  - CSR <-> `SSR` 
+- Static, Dynamic Rendering 개념까지 추가되면 헷갈리지 않기 위해 개념을 잘 알아야 함
+- 구현 방식을 통해 멘탈 모델을 알 수 있음
+  - App 라우터는 너무 추상화되어 있어 멘탈 모델을 알기가 어려움
+  - Pages 라우터를 먼저 확인해야 멘탈 모델을 알기 쉽고, 구현 방식의 변화를 알 수 있음
+
+### (2) SSG 구현 방식
+- Static Rendering : 고정된 내용이 렌더링됨
+
+#### 1. Pages 라우터에서 SSG 구현 방식
+- Pages 라우터에서는 모두 페이지 단위로 개발됨
+  - 예 : `Index.tsx` - Index 페이지 
+- getStaticPaths를 통해 정적인 Path 정보를 넘겨줄 수 있음
+  - 예 : Blog 페이지를 접속 => 블로그의 path를 확인 => id를 가져옴
+- getStaticProps를 통해 정적인 Props를 넘겨줄 수 있음
+  - 예 : Blog 페이지를 접속 => getStaticPaths를 통해 블로그의 path를 확인 => id를 가져옴 => 정적 데이터 id를 Props로 전달
+- getStaticProps를 통해 Static Site를 생성할 수 있음 
+  - 요청 전에 미리 렌더링 가능
+  - 고정된 정적인 데이터를 보여주는 방식
+
+<br>
+
+- 예시 코드 : 블로그 게시글을 정적으로 렌더링 -  `pages/blog/[id].tsx`
+```tsx
+import { GetStaticPaths, GetStaticProps } from 'next';
+
+interface Props {
+  id: string;
+  title: string;
+}
+
+export default function BlogPost({ id, title }: Props) {
+  return (
+    <div>
+      <h1>{title}</h1>
+      <p>Post ID: {id}</p>
+    </div>
+  );
+}
+
+// ✅ 어떤 경로를 생성할지 정의
+export const getStaticPaths: GetStaticPaths = async () => {
+  const res = await fetch('https://api.example.com/posts');
+  const posts = await res.json();
+
+  const paths = posts.map((post: any) => ({
+    params: { id: post.id.toString() },
+  }));
+
+  return {
+    paths, // 미리 생성할 경로 정의
+    fallback: false, // 정의되지 않은 경로는 404 반환
+  };
+};
+
+// ✅ 각 경로에 해당하는 데이터를 미리 가져와서 HTML 생성
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  const res = await fetch(`https://api.example.com/posts/${params?.id}`);
+  const post = await res.json();
+
+  return {
+    props: {
+      id: post.id,
+      title: post.title,
+    },
+  };
+};
+```
+
+#### 2. App 라우터에서 SSG 구현 방식
+- React Server Component에서 SSG 구현 조건
+  1. Dynamic APIs (cookies, headers ...)이 호출되지 않음
+  2. fetch해온 Data가 캐시된 상태
+     - 요청 전 미리 데이터를 알고 있어야 빌드 타임에 HTML을 미리 생성 가능
+
+<br>
+
+- 예시 : 블로그 게시글을 정적으로 렌더링 - `app/blog/[id]/page.tsx`
+```tsx
+import { notFound } from 'next/navigation';
+
+interface Props {
+  params: {
+    id: string;
+  };
+}
+
+export async function generateStaticParams() {
+  const res = await fetch('https://api.example.com/posts');
+  const posts = await res.json();
+
+  return posts.map((post: any) => ({
+    id: post.id.toString(),
+  }));
+}
+
+async function getPost(id: string) {
+  const res = await fetch(`https://api.example.com/posts/${id}`);
+  if (!res.ok) {
+    notFound();
+  }
+  return res.json();
+}
+
+export default async function BlogPost({ params }: Props) {
+  const post = await getPost(params.id);
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+
+```
+
+### (3) SSR 구현 방식
+- Dynamic Rendering : 고정되지 않고 클라이언트마다 변경됨
+  - Dynamic APIs (cookies, headers ...)가 호출됨
+  - 예 : 추천 아이템
+
+#### 1. Pages 라우터에서 SSR 구현 방식
+- getServersideProps를 통해 Props를 가져옴 
+  - 예 : `Index.tsx`에 Props를 전달
+- getStaticProps <-> getServersideProps 차이점 
+  - getStaticProps : 빌드 타임에 호출됨 (요청 전)
+  - getServersideProps : 런타임에 호출됨 (매 요청 시)
+    - 런타임 : 실제로 실행되는 시점, 브라우저에서 해당 코드가 실행될 때
+
+<br>
+
+- 예시 : 사용자 상태나 요청별로 데이터가 달라지는 경우 - `pages/blog/[id].tsx`
+```tsx
+import { GetServerSideProps } from 'next';
+
+interface Props {
+  id: string;
+  title: string;
+}
+
+export default function BlogPost({ id, title }: Props) {
+  return (
+    <div>
+      <h1>{title}</h1>
+      <p>Post ID: {id}</p>
+    </div>
+  );
+}
+
+// ✅ 요청이 발생할 때마다 동적으로 HTML 생성
+export const getServerSideProps: GetServerSideProps = async ({ params }) => {
+  const res = await fetch(`https://api.example.com/posts/${params?.id}`);
+  const post = await res.json();
+
+  return {
+    props: {
+      id: post.id,
+      title: post.title,
+    },
+  };
+};
+
+```
+
+#### 2. App 라우터에서 SSR 구현 방식
+- App 라우터에서 SSR 구현 조건 
+  - 둘 중 하나만 충족되더라도 SSR 방식으로 구현됨
+  1. Dynamic APIs (cookies, headers ...)를 호출할 때
+     - Dynamic Rendering 이자 SSR을 결정하는 요소
+  2. 캐시된 데이터가 없어 새롭게 바뀐 데이터를 가져올 때
+
+- 예시 : 사용자 상태나 요청별로 데이터가 달라지는 경우 - `app/blog/[id]/page.tsx`
+```tsx
+interface Props {
+  params: {
+    id: string;
+  };
+}
+
+async function getPost(id: string) {
+  const res = await fetch(`https://api.example.com/posts/${id}`, {
+    cache: 'no-store', // SSR 모드 설정
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch post');
+  }
+  return res.json();
+}
+
+export default async function BlogPost({ params }: Props) {
+  const post = await getPost(params.id);
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+
+```
+
+### (4) CSR <-> SSR / SSG, SSR, ISG 맥락에서 SSR 의미
+#### 1. CSR <-> SSR
+- 렌더링 위치에 따른 분류
+- Client <-> Server 각각에서 렌더링된다는 차이를 의미 
+
+#### 2. SSG, SSR, ISG 맥락
+- 렌더링 시점의 관점
+- 동일하게 Server Side Rendering이지만 요청 시마다 Dynamic하게 렌더링함
+
+### (5) ISR (Incremental Static Regeneration)
+- Static
+  - 기본적으로 정적인 렌더링
+  - 정적인 페이지(SSG)의 단점 : 바뀔 수 없음
+- `Re`generation 
+  - 캐시된 데이터를 `갱신`함으로 정적인 페이지의 `단점을 극복`
+  - cache => revalidate
+    - 특정한 주기마다 서버로 검증을 다시 요청하여 SSG를 다시 만들게 함
+
+#### 1. Pages 라우터에서 ISR 구현 방식
+- SSG 구현 방식 + 옵션 cache 값 설정
+
+- 예시 : 일정 시간마다 정적 페이지 갱신 - `pages/blog/[id].tsx`
+```tsx
+import { GetStaticProps, GetStaticPaths } from 'next';
+
+export default function BlogPost({ post }: any) {
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+
+export async function getStaticPaths() {
+  const res = await fetch('https://api.example.com/posts');
+  const posts = await res.json();
+
+  const paths = posts.map((post: any) => ({
+    params: { id: post.id.toString() },
+  }));
+
+  return { paths, fallback: 'blocking' };
+}
+
+export async function getStaticProps({ params }: any) {
+  const res = await fetch(`https://api.example.com/posts/${params.id}`);
+  const post = await res.json();
+
+  return {
+    props: { post },
+    revalidate: 10, // 10초마다 새로운 HTML 생성
+  };
+}
+
+```
+
+#### 2. App 라우터에서 ISR 구현 방식
+- `export const revalidate = 60`와 같이 작성되어있으면 revalidate이 발생한다고 판단함
+  - Pages 라우터에서 옵션 cache 값 설정한 것과 동일하게 인식
+
+- 예시 : 일정 시간마다 정적 페이지 갱신 - `app/blog/[id]/page.tsx`
+```tsx
+export const revalidate = 10; // 10초마다 갱신
+
+async function getPost(id: string) {
+  const res = await fetch(`https://api.example.com/posts/${id}`);
+  return res.json();
+}
+
+export default async function BlogPost({ params }: any) {
+  const post = await getPost(params.id);
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+
+```
