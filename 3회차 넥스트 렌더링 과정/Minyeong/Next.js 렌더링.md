@@ -80,27 +80,52 @@ Next.js는 SSR, SSG, ISR 등의 렌더링 방식을 제공하여 SEO 최적화 �
 - `getServerSideProps` (SSR)
   - 요청이 들어올 때마다 서버에서 데이터를 가져와 HTML을 생성
   - 최신 데이터를 제공할 때 유용하지만 서버 부하가 큼
-  - <code>export async function getServerSideProps() {
+  ```JavaScript
+  export async function getServerSideProps() {
   const res = await fetch("https://api.example.com/data");
   const data = await res.json();
   return { props: { data } };
-}
- </code>
+  ```
 
 - `getStaticProps` (SSG)
   - 빌드 시점에 데이터를 미리 가져와 정적 HTML을 생성하여 제공
   - SEO 최적화 및 속도가 빠름
-  - <code>export async function getStaticProps() {
+  ```JavaScript
+  export async function getStaticProps() {
   const res = await fetch("https://api.example.com/data");
   const data = await res.json();
   return { props: { data } };
-}</code>
+  ```
+
+- `getStaticPaths` (SSG)
+  - 빌드 시점에 동적 경로의 정적 페이지 생성을 위해 사용
+  - pages 디렉터리 안에 [param].js 같은 동적 라우트 파일을 만들었을 때 사용
+    - `getStaticPaths` 함수에서 경로 목록을 반환
+    - Next.js는 빌드 시 그 경로들에 대해 getStaticProps를 실행해 정적 HTML 파일로 생성
+    - 반환할 땐 paths 배열과 fallback 값 지정
+      ```JavaScript
+      export async function getStaticPaths() {
+        return {
+          paths: [
+            { params: { id: '1' } },
+            { params: { id: '2' } },
+          ],
+          fallback: false,
+        };
+      }
+      ```
+      <details>
+      <summary>fallback 옵션 정리</summary>
+      - false : paths에 정의된 경로만 생성, 나머지는 404 (경로가 적고 고정된 경우 적합) <br/>
+      - true : paths에 없는 경로는 요청 시 서버에서 HTML 생성 후 캐시에 저장 (경로가 많거나 동적 추가되는 경우 적합, 로딩 UI 필요) <br/>
+      - 'blocking' : true와 유사, 생성이 완료될 때까지 기다린 후 완성된 페이지 반환 (로딩 화면 없이 처음부터 완성된 페이지 제공)
 
 - `fetch()` API  
   - Next.js에서는 서버와 클라이언트에서 모두 fetch()를 사용할 수 있음
-  - <code>const res = await fetch("/api/data");
-const data = await res.json();
-</code>
+  ```JavaScript
+  const res = await fetch("/api/data");
+  const data = await res.json();
+  ```
 
 # 2. Next.js의 렌더링 과정
 ## 2-1. 사전 렌더링(Pre-rendering)과 하이드레이션(Hydration)
@@ -126,7 +151,7 @@ const data = await res.json();
 ## 2-2. Next.js의 주요 렌더링 방식
 ### CSR(Client-Side Rendering) - 클라이언트 사이드 렌더링
 **동작 과정**
-- 사용자가 웹사이트에 접속하면 서버는 빈 HTML 반환
+- 사용자가 웹사이트에 접속하면 서버는 빈 HTML 반환, JavaScript 다운로드
 - 브라우저가 JavaScript를 실행해 화면을 만들고, 데이터를 API에서 불러와 채움
 
 **특징**  
@@ -157,9 +182,9 @@ const data = await res.json();
 
 ### SSG(Static Site Generation) - 정적 사이트 생성
 **동작 과정**
-- Next.js가 빌드할 때 HTML 미리 만듦
-  - getStaticProps 사용해 데이터를 미리 가져와 HTML에 포함
-- 사용자가 요청하면 이미 만들어진 HTML을 그대로 보여줌
+- 빌드할 때 HTML 미리 만듦
+  - getStaticProps, getStaticPaths 사용해 데이터를 미리 가져와 HTML에 포함
+- 사용자가 요청하면 CDN에서 이미 만들어진 HTML을 받아 그대로 보여줌
 
 **특징**  
 - 정적 HTML을 제공해 SEO 최적화 및 빠른 속도
@@ -174,13 +199,14 @@ const data = await res.json();
 ### ISR(Incremental Static Regeneration) - 증분 정적 재생성
 **동작 과정**
 - SSG처럼 미리 정적 HTML 만들어 제공
-- `revalidate` 설정하면 일정 시간마다 새로운 데이터를 받아 HTMl 갱신
-    - <code>export async function getStaticProps() {
+- `revalidate` 설정해 새로운 데이터를 받을 시간 설정
+- 해당 주기가 지나면 다음 요청 때 백그라운드에서 HTML 재생성 및 CDN 업데이트
+  ```JavaScript
+  export async function getStaticProps() {
   const res = await fetch('https://api.example.com/data');
   const data = await res.json();
-  return { props: { data }, revalidate: 10 }; // 10초마다 새로운 데이터 갱신
-}
- </code>
+  return { props: { data }, revalidate: 10 };} // 10초마다 새로운 데이터 갱신
+  ```
 
 **특징**  
 - 속도가 빠르며 데이터 변경 반영 가능
@@ -189,6 +215,12 @@ const data = await res.json();
 **사용하는 경우**
 - 블로그 페이지(새 글이 올라오면 일정 시간마다 갱신)
 - 자주 업데이트되지만 실시간은 필요 없는 페이지
+
+<details>
+<summary>CDN(Content Delivery Network)</summary>
+전 세계 여러 위치에 정적 파일(HTML, CSS, JS, 이미지 등)을 캐싱해 두는 분산 서버 <br/>
+- 가까운 서버에서 빠르게 파일을 가져오도록 해 속도를 높임임
+
 
 
 | 구분 | CSR (Client Side Rendering) | SSR (Server Side Rendering) | SSG (Static Site Generation) | ISR (Incremental Static Regeneration) |
