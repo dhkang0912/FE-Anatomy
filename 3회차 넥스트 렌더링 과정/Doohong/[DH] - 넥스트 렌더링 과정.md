@@ -575,11 +575,13 @@ export default async function BlogPost({ params }: any) {
 
 ## Q&A 
 ### Q1. 브라우저, 리액트, 넥스트 렌더링 과정을 연결해서 설명해주세요.
-A1. Next.js는 SSR, SSG, ISR, CSR 방식을 통해 HTML 제공 시점을 결정합니다.
-SSR은 매 요청 시, SSG는 빌드 시, ISR은 일정 주기마다 새로운 HTML을 생성하고 브라우저에 반환합니다.
-CSR은 빈 HTML을 반환하고 브라우저에서 상태 및 이벤트 핸들러를 연결합니다.
-React는 Render 단계에서 Virtual DOM을 생성하고, Diffing 후 Commit 단계에서 실제 DOM에 반영합니다.
-이후 상태 변화 발생 시 Render → Commit 단계가 반복되면서 CSR처럼 상태 기반으로 업데이트됩니다.
+A1. Next.js에서는 먼저 SSR, SSG, ISR, CSR 방식에 따라 HTML 생성 시점이 결정됩니다. SSR에서는 매 요청 시 서버에서 새로운 HTML이 생성되고, SSG는 빌드 시점에서 HTML이 생성되며, ISR은 일정 시간마다 새로운 HTML이 생성됩니다. CSR은 빈 HTML이 반환됩니다.
+
+브라우저는 서버에서 전달받은 HTML을 파싱하고 DOM을 생성합니다. 이후 CSS를 파싱해 CSSOM을 생성하고 DOM과 CSSOM을 결합해 렌더 트리를 생성한 뒤, 레이아웃 → 페인트 과정을 통해 화면에 UI를 표시합니다.
+
+브라우저 렌더링이 완료된 후 JS 파일이 로딩되면 React가 실행되면서 Virtual DOM을 생성합니다. React는 기존 DOM과 Virtual DOM을 비교(Diffing)한 뒤, 차이가 발생한 부분만 Commit 단계에서 실제 DOM에 반영합니다. SSR, SSG, ISR의 경우 하이드레이션 과정에서 상태 및 이벤트 핸들러가 연결되고, 이후 상태 변화가 발생하면 React에서 CSR처럼 상태 기반으로 즉시 반영됩니다.
+
+결국 Next.js에서 HTML 생성 → 브라우저에서 렌더링 → React에서 하이드레이션 후 상태 및 이벤트 연결 → 상태 변화 발생 시 CSR처럼 즉각 반영되는 흐름으로 동작합니다. SSR, SSG, ISR에서는 새로운 HTML이 서버에서 반환되면 하이드레이션이 다시 발생하며, CSR에서는 상태 변화가 발생하면 React에서 바로 상태 기반으로 업데이트가 이루어집니다.
 
 ### Q2. Next의 렌더링 방식의 종류와 각 렌더링 방식의 차이점을 설명해주세요.
 A2. Next.js는 SSR, SSG, ISR, CSR 방식에 따라 HTML 제공 시점과 렌더링 방식이 다릅니다.
