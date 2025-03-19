@@ -14,6 +14,12 @@
     - [ISR(Incremental Static Regeneration) - 증분 정적 재생성](#isrincremental-static-regeneration---증분-정적-재생성)
   - [2-3. Next.js 라우터에 따른 렌더링 분류](#2-3-nextjs-라우터에-따른-렌더링-분류)
 - [3. 전체적인 렌더링 과정](#3-전체적인-렌더링-과정)
+- [Q\&A](#qa)
+  - [1. CSR, SSR, SSG, ISR 차이점과 각각의 장단점은 무엇인가요?](#1-csr-ssr-ssg-isr-차이점과-각각의-장단점은-무엇인가요)
+  - [2. Next.js에서 getStaticProps와 getServerSideProps의 차이점은 무엇인가요?](#2-nextjs에서-getstaticprops와-getserversideprops의-차이점은-무엇인가요)
+  - [3. RSC 페이로드에 대해 설명해보세요.](#3-rsc-페이로드에-대해-설명해보세요)
+  - [4. 서버 컴포넌트와 클라이언트 컴포넌트의 차이와 어떨 때 사용해야 하는지 설명해보세요.](#4-서버-컴포넌트와-클라이언트-컴포넌트의-차이와-어떨-때-사용해야-하는지-설명해보세요)
+  - [5. 하이드레이션이란 무엇인가요?](#5-하이드레이션이란-무엇인가요)
 
 # 1. Next.js 란?
 Next.js는 React 기반의 웹 프레임워크로, 서버 사이드 렌더링(SSR)과 정적 사이트 생성(SSG) 등을 지원하여 SEO 최적화 및 빠른 페이지 로딩 속도를 제공하는 것이 특징이다.
@@ -80,27 +86,52 @@ Next.js는 SSR, SSG, ISR 등의 렌더링 방식을 제공하여 SEO 최적화 �
 - `getServerSideProps` (SSR)
   - 요청이 들어올 때마다 서버에서 데이터를 가져와 HTML을 생성
   - 최신 데이터를 제공할 때 유용하지만 서버 부하가 큼
-  - <code>export async function getServerSideProps() {
+  ```JavaScript
+  export async function getServerSideProps() {
   const res = await fetch("https://api.example.com/data");
   const data = await res.json();
   return { props: { data } };
-}
- </code>
+  ```
 
 - `getStaticProps` (SSG)
   - 빌드 시점에 데이터를 미리 가져와 정적 HTML을 생성하여 제공
   - SEO 최적화 및 속도가 빠름
-  - <code>export async function getStaticProps() {
+  ```JavaScript
+  export async function getStaticProps() {
   const res = await fetch("https://api.example.com/data");
   const data = await res.json();
   return { props: { data } };
-}</code>
+  ```
+
+- `getStaticPaths` (SSG)
+  - 빌드 시점에 동적 경로의 정적 페이지 생성을 위해 사용
+  - pages 디렉터리 안에 [param].js 같은 동적 라우트 파일을 만들었을 때 사용
+    - `getStaticPaths` 함수에서 경로 목록을 반환
+    - Next.js는 빌드 시 그 경로들에 대해 getStaticProps를 실행해 정적 HTML 파일로 생성
+    - 반환할 땐 paths 배열과 fallback 값 지정
+      ```JavaScript
+      export async function getStaticPaths() {
+        return {
+          paths: [
+            { params: { id: '1' } },
+            { params: { id: '2' } },
+          ],
+          fallback: false,
+        };
+      }
+      ```
+      <details>
+      <summary>fallback 옵션 정리</summary>
+      - false : paths에 정의된 경로만 생성, 나머지는 404 (경로가 적고 고정된 경우 적합) <br/>
+      - true : paths에 없는 경로는 요청 시 서버에서 HTML 생성 후 캐시에 저장 (경로가 많거나 동적 추가되는 경우 적합, 로딩 UI 필요) <br/>
+      - 'blocking' : true와 유사, 생성이 완료될 때까지 기다린 후 완성된 페이지 반환 (로딩 화면 없이 처음부터 완성된 페이지 제공)
 
 - `fetch()` API  
   - Next.js에서는 서버와 클라이언트에서 모두 fetch()를 사용할 수 있음
-  - <code>const res = await fetch("/api/data");
-const data = await res.json();
-</code>
+  ```JavaScript
+  const res = await fetch("/api/data");
+  const data = await res.json();
+  ```
 
 # 2. Next.js의 렌더링 과정
 ## 2-1. 사전 렌더링(Pre-rendering)과 하이드레이션(Hydration)
@@ -126,7 +157,7 @@ const data = await res.json();
 ## 2-2. Next.js의 주요 렌더링 방식
 ### CSR(Client-Side Rendering) - 클라이언트 사이드 렌더링
 **동작 과정**
-- 사용자가 웹사이트에 접속하면 서버는 빈 HTML 반환
+- 사용자가 웹사이트에 접속하면 서버는 빈 HTML 반환, JavaScript 다운로드
 - 브라우저가 JavaScript를 실행해 화면을 만들고, 데이터를 API에서 불러와 채움
 
 **특징**  
@@ -157,9 +188,9 @@ const data = await res.json();
 
 ### SSG(Static Site Generation) - 정적 사이트 생성
 **동작 과정**
-- Next.js가 빌드할 때 HTML 미리 만듦
-  - getStaticProps 사용해 데이터를 미리 가져와 HTML에 포함
-- 사용자가 요청하면 이미 만들어진 HTML을 그대로 보여줌
+- 빌드할 때 HTML 미리 만듦
+  - getStaticProps, getStaticPaths 사용해 데이터를 미리 가져와 HTML에 포함
+- 사용자가 요청하면 CDN에서 이미 만들어진 HTML을 받아 그대로 보여줌
 
 **특징**  
 - 정적 HTML을 제공해 SEO 최적화 및 빠른 속도
@@ -174,13 +205,14 @@ const data = await res.json();
 ### ISR(Incremental Static Regeneration) - 증분 정적 재생성
 **동작 과정**
 - SSG처럼 미리 정적 HTML 만들어 제공
-- `revalidate` 설정하면 일정 시간마다 새로운 데이터를 받아 HTMl 갱신
-    - <code>export async function getStaticProps() {
+- `revalidate` 설정해 새로운 데이터를 받을 시간 설정
+- 해당 주기가 지나면 다음 요청 때 백그라운드에서 HTML 재생성 및 CDN 업데이트
+  ```JavaScript
+  export async function getStaticProps() {
   const res = await fetch('https://api.example.com/data');
   const data = await res.json();
-  return { props: { data }, revalidate: 10 }; // 10초마다 새로운 데이터 갱신
-}
- </code>
+  return { props: { data }, revalidate: 10 };} // 10초마다 새로운 데이터 갱신
+  ```
 
 **특징**  
 - 속도가 빠르며 데이터 변경 반영 가능
@@ -189,6 +221,12 @@ const data = await res.json();
 **사용하는 경우**
 - 블로그 페이지(새 글이 올라오면 일정 시간마다 갱신)
 - 자주 업데이트되지만 실시간은 필요 없는 페이지
+
+<details>
+<summary>CDN(Content Delivery Network)</summary>
+전 세계 여러 위치에 정적 파일(HTML, CSS, JS, 이미지 등)을 캐싱해 두는 분산 서버 <br/>
+- 가까운 서버에서 빠르게 파일을 가져오도록 해 속도를 높임
+</details>
 
 
 | 구분 | CSR (Client Side Rendering) | SSR (Server Side Rendering) | SSG (Static Site Generation) | ISR (Incremental Static Regeneration) |
@@ -221,18 +259,40 @@ const data = await res.json();
 **App Router (app/)**
 - Next.js 13에서 도입된 새로운 방식
 - React Server Components(RSC)를 활용해 서버에서 렌더링
+  - RSC는 React에서 서버에서만 렌더링되는 컴포넌트
+  - 서버에서 컴포넌트를 렌더링한 결과를 HTML처럼 바로 보내는 게 아닌, JSON 형태의 데이터로 전달
+    - 서버 컴포넌트는 서버에서 실행되기 때문에 fetch나 DB 조회 등 서버 자원 접근 가능 -> 데이터를 가져와 컴포넌트 트리의 일부로 렌더링 결과에 포함
+      - 서버는 여러 API를 비동기 병렬(fetch나 Promise.all)로 호출 가능
+  - **RSC 페이로드** : 어떤 컴포넌트를 어떤 트리 구조로 보여줘야 하는지에 대한 정보
+    - 어떤 컴포넌트 트리가 그려져야 하는지 정보
+    - 각 컴포넌트의 props 값
+    - 서버 컴포넌트 내부에서 가져온 최종 데이터 결과
+    - 즉, 서버에서 미리 데이터 패칭까지 끝내고, 그 데이터를 포함한 컴포넌트 구조 정보
+  - 클라이언트는 이 정보를 받아 실제 필요한 부분만 클라이언트 컴포넌트로 동작할 수 있게 하이드레이션(API 재호출 안 함)
+  - 기존에는 모든 컴포넌트가 클라이언트로 번들링되어 내려갔기 때문에 JS 용량이 커졌으나, RSC는 서버에서 무거운 계산 등을 처리하고 최소한의 정보만 클라이언트로 보내 JS 번들이 가벼워지고 결과적으로 빠른 초기 렌더링과 가벼운 페이지 제공 가능
+- `Suspense`와 함께 사용하면 좋음
+  - Suspense : 비동기 작업이 끝날 때까지 대기 상태를 관리하고, 그동안 보여줄 대체 UI(fallback)를 지정해주는 기능
+  - pages router에서도 `React.lazy()`를 통해 JS 모듈 로딩시 import하여 제공 가능
+  ```tsx
+  import { Suspense } from 'react';
 
+  function Loading() {
+    return <p>로딩 중...</p>;
+  }
 
-<details>
-<summary>Streaming이란?</summary>
-<div markdown="1">
-데이터를 한 번에 모두 전송하는 것이 아닌 조각(chunk) 단위로 조금씩 보내면서 점진적으로 처리하는 방식 <br/>
-- 서버가 HTML을 완성될 때까지 기다리지 않고 부분적으로 렌더링 가능한 부분부터 먼저 전송 가능 <br/>
-  
-- 브라우저가 요청 보냄 -> 서버가 렌더링 가능한 부분부터 즉시 브라우저로 전송 -> 이후 데이터가 준비되는 대로 추가적인 HTML을 조각 단위로 전송 -> 브라우저는 받아온 HTML을 즉시 렌더링하면서 점진적으로 페이지 완성
-</div>
-</details>
+  function SomeComponent() {
+    // 내부에서 데이터 가져오거나 무거운 작업 수행
+    return <div>완성된 콘텐츠</div>;
+  }
 
+  export default function Page() {
+    return (
+      <Suspense fallback={<Loading />}>
+        <SomeComponent />
+      </Suspense>
+    );
+  }
+  ```
 
 <details>
 <summary>서버 컴포넌트와 클라이언트 컴포넌트</summary>
@@ -274,6 +334,15 @@ const data = await res.json();
 </div>
 </details>
 
+<details>
+<summary>Streaming이란?</summary>
+<div markdown="1">
+데이터를 한 번에 모두 전송하는 것이 아닌 조각(chunk) 단위로 조금씩 보내면서 점진적으로 처리하는 방식 <br/>
+- 서버가 HTML을 완성될 때까지 기다리지 않고 부분적으로 렌더링 가능한 부분부터 먼저 전송 가능 <br/>
+  
+- 브라우저가 요청 보냄 -> 서버가 렌더링 가능한 부분부터 즉시 브라우저로 전송 -> 이후 데이터가 준비되는 대로 추가적인 HTML을 조각 단위로 전송 -> 브라우저는 받아온 HTML을 즉시 렌더링하면서 점진적으로 페이지 완성
+</div>
+</details>
 
 <br />
 
@@ -294,3 +363,29 @@ const data = await res.json();
 - HTML & CSS 파싱하여 DOM, CSSOM 생성
 - Render Tree 형성 (DOM + CSSOM 결합)
 - Layout → Paint → Composite & Display 과정을 거쳐 최종적으로 화면 표시
+
+# Q&A
+## 1. CSR, SSR, SSG, ISR 차이점과 각각의 장단점은 무엇인가요?
+CSR은 요청 시 서버가 최소한의 HTML과 JavaScript를 반환하고, 브라우저에서 JS를 실행해 화면을 렌더링하는 방식입니다. 동적 상호작용에 강하지만 초기 로딩 시 콘텐츠가 보이지 않고 SEO에 취약할 수 있습니다.  
+SSR은 요청 시 서버에서 HTML을 완성해 반환하는 방식으로, 초기 로딩 속도와 SEO가 뛰어나지만 요청마다 서버의 연산 부하가 발생합니다.  
+SSG는 빌드 시 HTML을 미리 생성해 배포하는 방식으로, 성능과 비용 효율이 좋고 빠르게 응답할 수 있지만 실시간 데이터 반영이 어렵습니다.  
+ISR은 SSG의 한계를 보완하는 방식으로, revalidate 속성을 사용해 일정 주기마다 정적 페이지를 자동으로 재생성합니다. 빠른 성능과 일정 주기의 최신성을 동시에 가져갈 수 있지만 구현과 관리가 상대적으로 복잡합니다.
+
+## 2. Next.js에서 getStaticProps와 getServerSideProps의 차이점은 무엇인가요?
+getStaticProps는 빌드 시 실행되어 정적 페이지 생성을 위한 데이터를 미리 가져오는 함수입니다. 변동이 거의 없거나 주기적인 콘텐츠에 적합하며 성능이 뛰어납니다.  
+getServerSideProps는 페이지 요청 시마다 서버에서 실행되어 데이터를 가져오고 HTML을 동적으로 생성하는 함수입니다. 실시간 데이터나 사용자 맞춤형 페이지처럼 매 요청마다 다른 정보를 보여줘야 할 때 적합합니다.
+
+## 3. RSC 페이로드에 대해 설명해보세요.
+RSC는 React Server Components의 약자로, 클라이언트가 서버로부터 JSON 형태의 구성 정보(페이로드)를 받아 필요한 컴포넌트를 클라이언트에서 조립하는 방식입니다.  
+이 페이로드에는 HTML이 아닌 렌더링 정보와 컴포넌트 트리 정보가 담겨 있으며, 클라이언트는 이 데이터를 기반으로 UI를 렌더링합니다.  
+이를 통해 불필요한 JavaScript 번들을 줄이고, 서버 자원을 활용해 초기 렌더링 속도와 성능을 개선할 수 있습니다.  
+
+## 4. 서버 컴포넌트와 클라이언트 컴포넌트의 차이와 어떨 때 사용해야 하는지 설명해보세요.
+서버 컴포넌트는 서버에서 렌더링되고 브라우저로 전달되며, 클라이언트 측에서는 별도의 JS 번들로 다운로드되지 않습니다. 주로 데이터 페칭, 보안 처리, 렌더링 최적화에 적합합니다.  
+클라이언트 컴포넌트는 브라우저에서 실행되는 컴포넌트로, 상호작용이 필요한 부분(버튼 클릭, 입력 폼 등)이나 상태 관리를 필요로 하는 UI에 사용됩니다.  
+일반적으로 데이터 중심적이고 상호작용이 필요 없는 컴포넌트는 서버 컴포넌트로 작성하고, 사용자 이벤트나 동적 상태가 필요한 부분은 클라이언트 컴포넌트로 나누어 설계합니다.
+
+## 5. 하이드레이션이란 무엇인가요?
+하이드레이션은 요청 또는 빌드 시점에 생성된 정적 HTML에 클라이언트 측 JavaScript를 연결해 상호작용 기능을 활성화하는 과정입니다.  
+초기에는 정적인 HTML로 빠르게 화면을 렌더링하고, 이후 React의 가상 DOM과 연결하여 이벤트 처리 및 상태 변경과 같은 동적 기능이 가능하도록 만드는 단계입니다.  
+이 과정을 통해 SSR이나 SSG로 미리 렌더링된 페이지가 사용자와 상호작용할 수 있는 완전한 리액트 앱으로 동작하게 됩니다.
