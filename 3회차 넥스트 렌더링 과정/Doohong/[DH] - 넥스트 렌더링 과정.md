@@ -27,6 +27,7 @@
     - [(5) ISR (Incremental Static Regeneration)](#5-isr-incremental-static-regeneration)
       - [1. Pages 라우터에서 ISR 구현 방식](#1-pages-라우터에서-isr-구현-방식)
       - [2. App 라우터에서 ISR 구현 방식](#2-app-라우터에서-isr-구현-방식)
+  - [3. Next 렌더링 과정 요약](#3-next-렌더링-과정-요약)
   - [Q\&A](#qa)
     - [Q1. 브라우저, 리액트, 넥스트 렌더링 과정을 연결해서 설명해주세요.](#q1-브라우저-리액트-넥스트-렌더링-과정을-연결해서-설명해주세요)
     - [Q2. Next의 렌더링 방식의 종류와 각 렌더링 방식의 차이점을 설명해주세요.](#q2-next의-렌더링-방식의-종류와-각-렌더링-방식의-차이점을-설명해주세요)
@@ -556,6 +557,21 @@ export default async function BlogPost({ params }: any) {
 }
 
 ```
+
+## 3. Next 렌더링 과정 요약
+1. 브라우저 렌더링 단계
+- HTML/CSS 파싱 → DOM/CSSOM 생성 → 렌더 트리 생성 → 레이아웃 → 페인트
+
+2. Next.js에서 SSR/SSG/ISR 발생 시
+- 서버에서 HTML 생성 → 브라우저로 전달 → DOM 생성 (초기 렌더링)
+
+3. React 렌더링 단계
+- Virtual DOM 생성 → Diffing → Commit 단계에서 실제 DOM 반영
+- 상태 변화 발생 시 Render → Commit 반복
+
+4. 상태 변화 발생 시
+- CSR과 동일하게 상태 기반 렌더링
+- React의 Virtual DOM 기반 렌더링 구조로 동작
 
 ## Q&A 
 ### Q1. 브라우저, 리액트, 넥스트 렌더링 과정을 연결해서 설명해주세요.
