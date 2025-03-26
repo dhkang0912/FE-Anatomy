@@ -14,6 +14,16 @@
       - [2-3-1. environmentRecord와 호이스팅](#2-3-1-environmentrecord와-호이스팅)
       - [(1) 호이스팅 규칙](#1-호이스팅-규칙)
       - [(2) 함수 선언문과 함수 표현식](#2-함수-선언문과-함수-표현식)
+      - [2-3-2. 스코프, 스코프 체인, outerEnvironmentReference](#2-3-2-스코프-스코프-체인-outerenvironmentreference)
+      - [2-3-3. 지역 변수와 전역 변수](#2-3-3-지역-변수와-전역-변수)
+    - [2-4. this](#2-4-this)
+    - [2-5. 정리](#2-5-정리)
+  - [Q\&A](#qa)
+    - [Q1. 자바스크립트에서 호이스팅이 무엇인가요?](#q1-자바스크립트에서-호이스팅이-무엇인가요)
+    - [Q2. 함수 선언문과 함수 표현식의 차이점은 무엇인가요?](#q2-함수-선언문과-함수-표현식의-차이점은-무엇인가요)
+    - [Q3. 스코프 체인이 무엇이고 어떻게 동작하나요?](#q3-스코프-체인이-무엇이고-어떻게-동작하나요)
+    - [Q4.깊은 복사와 얕은 복사의 차이점은 무엇인가요?](#q4깊은-복사와-얕은-복사의-차이점은-무엇인가요)
+    - [Q5. Lexical Environment에 대해 설명하세요.](#q5-lexical-environment에-대해-설명하세요)
 
 # 코어 자바스크립트
 ## 1-5. 불변 객체
@@ -599,3 +609,246 @@
     - 함수 표현식의 경우 함수를 선언한 코드에 도달하지 않았는데 호출하는 경우 에러가 남 => 디버깅 용이
     - 원활한 협업을 위해 전역공간에 함수를 선언하거나 동명의 함수를 중복 선언하지 않아야 함
 
+#### 2-3-2. 스코프, 스코프 체인, outerEnvironmentReference
+> **스코프 : 식별자에 대한 유효범위**
+> - 경계 외부에서 선언한 변수는 경계 내부에서도 접근 가능하지만, 경계 내부에서 선언한 변수는 오직 내부에서만 접근 가능
+- ES5까지의 자바스크립트는 전역 공간을 제외하면 `오직 함수에 의해서만 스코프가 생성됨`
+
+<br>
+
+> **스코프 체인 : 식별자의 유효범위를 안에서부터 바깥으로 차례대로 검색해나가는 것**
+> - LexicalEnvironment의 두번째 수집자료인 outerEnvironmentReference로 인해 가능
+- outerEnvironmentReference는 `현재 호출된 함수가 선언될 당시`의 LexicalEnvironment를 참조
+  - 선언한다는 것은 콜 스택 상에서 당시 특정 실행 컨텍스트가 활성화된 상태
+  - outerEnvironmentReference는 연결 리스트 형태를 띄며 선언된 시점의 LexicalEnvironment를 계속 찾아 올라가면서 전역 컨텍스트의 LexicalEnvironment까지 확인 가능
+    - 현재 실행된 함수가 선언되어 있는 외부 환경을 참조하게 됨
+    - 가장 가까운 요소부터 외부로 연결된 순서대로 접근할 수 있고 다른 순서로 접근은 불가능
+
+<br>
+
+- 📌 예제로 알아보기 : 스코프 체인
+    ```JS
+    var a = 1;
+
+    var outer = function() {
+        var inner = function() {
+            console.log(a);
+            var a = 3;
+        };
+        
+        inner();
+        console.log(a);
+    };
+
+    outer();
+    console.log(a);
+
+    ```
+    1. 전역 컨텍스트가 활성화되고 전역 컨텍스트의 environmentRecord에 {a, outer} 식별자 저장
+        - 전역 컨텍스트는 선언 시점이 없기 때문에 outerEnvironmentReference에는 아무것도 담기지 않음
+        - this: 전역 객체
+    2. 변수 a = 1, outer에 함수 할당
+    3. outer 함수 호출, 전역 컨텍스트의 코드는 2번에서 임시 중단되고 outer 함수의 실행 컨텍스트가 활성화됨
+    4. outer 함수의 실행 컨텍스트의 environmentRecord에 { inner } 식별자를 저장
+        - outerEnvironmentReference에는 outer 함수가 선언될 당시의 LexicalEnvironment가 담김
+        - outer 함수는 전역 공간에서 선언됐기 때문에 전역 컨텍스트의 LexicalEnvironment를 참조 복사하며 [GLOBAL, { a, outer }]라고 표기
+          - GLOBAL : 실행 컨텍스트 이름, { a, outer } : environmentRecord 객체, this : 전역 객체
+    5. outer 스코프에 있는 변수 inner에 함수를 할당
+    6. inner 함수 호출 => outer 실행 컨텍스트는 임시 중단, inner 실행 컨텍스트 활성화 
+    7. inner 실행 컨텍스트의 environmentRecord에 {a} 식별자 저장
+        - outerEnvironmentReference에는 inner 함수가 선언될 당시 LexicalEnvironment가 담김
+        - inner 함수는 outer 함수 내부에 선언됐기 때문에 outer 함수의 LexicalEnvironment를 참조 => [outer, {inner}]를 참조 복사, this : 전역 객체
+    8. 식별자 a에게 접근 => 활성화된 inner 컨텍스트의 environmentRecord에서 a를 검색하지만 아직 할당된 값이 없음
+       - undefined 출력
+    9. inner 스코프에 있는 변수 a에 3 할당
+    10. inner 함수 실행이 종료되고 inner 실행 컨텍스트가 콜 스택에서 제거되고 다시 outer 실행 컨텍스트가 활성화되고 중단했던 코드 다음으로 이동
+    11. 식별자 a에 접근하며 자바스크립트 엔진이 활성화된 실행 컨텍스트의 LexicalEnvironment에 접근하며 첫 요소의 environmentRecord에 a를 찾아보고 없으면 outerEnvironmentReference를 찾고 거기서도 못 찾으면 그 안 environmentRecord에서 찾고 없으면 outerEnvironmentReference를 찾는 식으로 거슬러 올라가면서 찾음
+        - 예제에서는 전역 LexicalEnvironment에서 확인하고 1을 출력하게 됨
+    12. outer 함수 실행이 종료되고 outer 실행 컨텍스트가 콜 스택에서 제거됨 => 바로 아래의 전역 컨텍스트가 다시 활성화되고 중단했던 코드의 다음으로 이동
+    13. 식별자 a에 접근하기 위해 활성화된 전역 컨텍스트의 environmentRecord에서 a 검색하고 1 출력 => 모든 코드 실행이 완료되면서 전역 컨텍스트가 콜 스택에서 제거되고 종료됨
+
+    <br>
+
+    ![alt text](<images/코드 흐름과 스코프 체인.png>)
+    - 전체 윤곽을 왼쪽에서 오른쪽으로 바라보면 `전역 컨텍스트 outer 컨텍스트 -> inner 컨텍스트` 순으로 점차 규모가 작아지는 반면 스코프 체인을 타고 접근 가능한 변수의 수는 늘어남
+
+<br> 
+
+> **변수 은닉화 : 스코프 체인 상 있는 변수지만 접근 불가능한 변수**
+
+```JS
+var a = 1;
+
+var outer = function() {
+    var inner = function() {
+        console.log(a);
+        var a = 3;
+    };
+    
+    inner();
+    console.log(a);
+};
+
+outer();
+console.log(a);
+```
+
+- 식별자 a의 경우 전역 공간, inner 함수 내부에서 선언됨
+  - inner 함수 내부에서 a에 접근하려면 무조건 스코프 체인 상 첫번째 인자인 inner 스코프의 LexicalEnvironment부터 검색하게 되고 그 안에 a 식별자가 존재하여 이를 반환 => 전역 공간의 동일한 이름 a 변수에 접근 불가능
+
+<br>
+
+- 🚫 참고 : 상위 스코프 정보 콘솔로 확인하기 
+    - 현재 실행 컨텍스트를 제외한 상위 스코프 정보는 함수 내부에서 함수를 출력하여 확인 가능
+  
+    ```JS
+    var a = 1;
+
+    var outer = function() {
+        var b = 2;
+
+        var inner = function() {
+            console.dir(inner);
+        };
+
+        inner();
+    };
+
+    outer();
+
+    ```
+    ![alt text](<images/개발자 도구 출력 결과.png>)
+    - 함수 내부에서 실제로 호출할 외부 변수들의 정보만 보여줌
+
+    <br>
+
+    ```JS
+    var a = 1;
+
+    var outer = function() {
+        var b = 2;
+
+        var inner = function() {
+            console.log(b);
+            console.dir(inner);
+        };
+
+        inner();
+    };
+
+    outer();
+
+    ```
+    ![alt text](<images/개발자 도구 출력 결과 2.png>)
+
+    <br>
+
+    - 스코프 체인을 디버거로 확인하기
+    ```JS
+    var a = 1;
+
+    var outer = function() {
+        var b = 2;
+
+        var inner = function() {
+            console.log(b);
+            debugger;
+        };
+
+        inner();
+    };
+
+    outer();
+
+    ```
+    ![alt text](<images/스코프 체인 디버깅 화면.png>)
+
+#### 2-3-3. 지역 변수와 전역 변수 
+> **지역 변수 : 함수 내부에서 선언된 변수**
+> **전역 변수 : 전역 공간에서 선언한 변수**
+- 코드의 안전성을 위해 가급적 전역 변수 사용을 최소화해야 함수
+
+### 2-4. this 
+- 실행 컨텍스트의 `thisBinding`에는 this로 지정된 객체가 저장됨
+- 실행 컨텍스트 활성화 당시에 this가 지정 안되면 `전역 객체`가 저장됨
+
+### 2-5. 정리 
+> **실행 컨텍스트 : 실행할 코드에 제공할 환경 정보들을 모아놓은 객체**
+> - 전역 컨텍스트, eval 및 함수 실행에 의한 컨텍스트 등이 있음
+> - 실행 컨텍스트 객체는 활성화되는 시점에 `VariableEnvironment`, `LexicalEnvironment`, `ThisBinding` 3가지 정보를 수집
+> - 실행 컨텍스트를 생성할 때는 VariableEnvironment와 LexicalEnvironment이 동일한 내용으로 구성됨
+>   - LexicalEnvironment 함수는 실행 도중 변경되는 사항이 즉시 반영
+>   - VariableEnvironment는 초기 상태 유지
+
+<br>
+
+> **LexicalEnvironment : environmentRecord와 outerEnvironmentReference로 구성**
+> - environmentRecord : 매개변수명, 변수의 식별자, 선언한 삼수의 함수명을 수집
+>   - 호이스팅 : 코드 해석을 수월하게 하기 위해 environmentRecord의 수집 과정을 추상화 => 실행 컨텍스트가 관여하는 코드 집단의 최상단으로 이들을 끌어올린다고 해석
+>       - 변수 선언과 값 할당이 동시에 된 경우 선언부만 호이스팅 
+>       - 할당 과정은 원래 자리에서 진행  
+>       => 함수 선언문과 표현식의 차이 발생
+> - outerEnvironmentReference : 직전 컨텍스트의 LexicalEnvironment를 참조
+
+<br>
+
+> **스코프 : 변수의 유효범위**
+> - outerEnvironmentReference는 해당 함수가 선언된 위치의 LexicalEnvironment를 참조
+>   - 변수에 접근하기 위해 현재 LexicalEnvironment에서 발견되면 그 값을 반환하고 못할 경우 outerEnvironmentReference에 담긴 LexicalEnvironment를 탐색
+>   - 전역 컨텍스트의 LexicalEnvironment까지 탐색해도 변수를 찾지 못하면 undefined를 반환
+
+<br>
+
+> **전역 변수 : 전역 컨텍스트의 LexicalEnvironment에 담긴 변수**
+> **지역 변수 : 그 밖의 함수에 의해 생성된 실행 컨텍스트의 변수**
+
+<br>
+
+> **this : 실행 컨텍스트를 활성화하는 당시에 지정된 this가 저장됨**
+>   - 함수를 호출하는 방법에 따라 그 값이 달라짐
+>   - 지정되지 않은 경우 전역 객체 저장
+
+## Q&A 
+### Q1. 자바스크립트에서 호이스팅이 무엇인가요?
+A1. **호이스팅(Hoisting)**은 자바스크립트 엔진이 변수와 함수의 선언을 코드의 최상단으로 끌어올리는 것처럼 동작하는 현상입니다. 실제로 코드가 물리적으로 이동하는 것은 아니지만, 자바스크립트 엔진이 실행 컨텍스트를 생성할 때 변수와 함수의 선언 정보를 미리 수집하고 메모리에 저장하기 때문에 이런 현상이 발생합니다.
+
+호이스팅은 변수 선언 방식에 따라 작동 방식이 다릅니다.
+
+var로 선언한 변수는 선언이 호이스팅되며, 초기값은 undefined로 설정됩니다. 따라서 변수 선언 전에 접근하면 undefined가 출력됩니다.
+
+let과 const는 선언만 호이스팅되지만 초기화되지 않기 때문에 선언 전에 접근하면 ReferenceError가 발생합니다. 이것은 TDZ(Temporal Dead Zone) 때문인데, TDZ는 변수 선언이 호이스팅된 시점부터 값이 할당되기 전까지의 구간을 의미합니다. 즉, let과 const는 값이 할당되기 전까지 접근할 수 없습니다.
+
+const는 let과 마찬가지로 TDZ가 발생하지만, 한 번 값이 할당되면 값을 변경할 수 없습니다. 따라서 재할당이 불가능하며, 반드시 선언과 동시에 초기화해야 합니다.
+
+함수의 경우에도 선언 방식에 따라 호이스팅 동작이 다릅니다.
+
+함수 선언문은 함수 자체가 메모리에 저장되기 때문에 선언 전에 함수 호출이 가능합니다.
+
+함수 표현식은 변수 선언만 호이스팅되고 값은 할당되지 않기 때문에 함수가 값으로 할당되기 전에는 호출할 수 없습니다. 따라서 함수 표현식에서 선언 전에 함수를 호출하면 TypeError가 발생합니다.
+
+정리하자면, var는 선언과 초기화가 함께 이루어지기 때문에 undefined로 초기화되지만, let과 const는 선언만 호이스팅되고 값은 초기화되지 않기 때문에 초기화되기 전에는 접근할 수 없습니다. 함수 선언문은 함수 자체가 메모리에 저장되기 때문에 선언 전에 호출할 수 있지만, 함수 표현식은 변수 선언만 호이스팅되기 때문에 값이 할당되기 전에는 호출할 수 없습니다.
+
+### Q2. 함수 선언문과 함수 표현식의 차이점은 무엇인가요?
+A2. 함수 선언문은 함수 자체가 호이스팅되기 때문에 함수 선언 이전에도 호출이 가능합니다.
+반면 함수 표현식은 변수 선언만 호이스팅되고 값은 할당되지 않기 때문에 선언 전에 호출하면 TypeError가 발생합니다.
+
+### Q3. 스코프 체인이 무엇이고 어떻게 동작하나요?
+A3. 스코프 체인이란 식별자를 검색할 때 현재 스코프에서 시작해서 상위 스코프를 따라가며 탐색하는 구조를 의미합니다.
+
+함수가 선언될 당시의 LexicalEnvironment가 저장되며, 함수 호출 시 해당 LexicalEnvironment를 통해 상위 스코프에 접근합니다.
+
+현재 스코프에서 식별자를 찾지 못하면 상위 스코프의 outerEnvironmentReference를 따라가며 전역까지 탐색합니다.
+
+### Q4.깊은 복사와 얕은 복사의 차이점은 무엇인가요?
+A4. 얕은 복사는 객체의 참조 값(메모리 주소)만 복사하기 때문에 원본이 수정되면 복사본도 수정됩니다.
+
+깊은 복사는 객체의 모든 값을 새로운 메모리 공간에 복사하기 때문에 원본이 수정되더라도 복사본에는 영향을 미치지 않습니다.
+
+### Q5. Lexical Environment에 대해 설명하세요.
+A5. Lexical Environment는 자바스크립트에서 변수나 함수의 식별자와 그 값의 관계를 저장하고 관리하는 환경입니다. 함수나 코드 블록이 실행될 때마다 새로운 Lexical Environment가 생성됩니다.
+
+Lexical Environment는 Environment Record와 Outer Environment Reference로 구성됩니다. Environment Record는 현재 스코프에서 선언된 변수와 함수의 정보를 저장하며, Outer Environment Reference는 상위 스코프의 Lexical Environment를 참조합니다.
+
+자바스크립트는 **정적 스코프(Lexical Scope)**를 따르기 때문에 함수가 선언될 당시의 Lexical Environment가 실행 시점에도 유지됩니다. 함수가 호출될 때는 현재 스코프에서 식별자를 먼저 찾고, 없으면 Outer Environment Reference를 따라 상위 스코프로 이동하며 전역까지 탐색합니다. 이렇게 상위 스코프를 따라가는 구조를 **스코프 체인(Scope Chain)**이라고 합니다.
+
+결론적으로, Lexical Environment는 변수와 함수의 유효 범위를 관리하고, 스코프 체인을 통해 상위 스코프의 변수에 접근할 수 있도록 도와주는 역할을 합니다.
