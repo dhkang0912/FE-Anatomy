@@ -3,6 +3,8 @@
   - [2. 제어권](#2-제어권)
     - [2-1. 호출 시점](#2-1-호출-시점)
     - [2-2. 인자](#2-2-인자)
+    - [2-3. this](#2-3-this)
+  - [3. 콜백 함수는 함수다](#3-콜백-함수는-함수다)
 
 # 콜백함수
 ## 1. 콜백 함수란?
@@ -84,7 +86,7 @@
     <br>
 
     - **코드 실행 방식과 제어권**
-    ![Alt text](<코드 실행 방식과 제어권.png>)
+    ![Alt text](<images/코드 실행 방식과 제어권.png>)
 
     <br>
 
@@ -112,3 +114,98 @@
   // [15, 25, 35]
 
   ```
+  - newArr 변수 선언 후 우항의 결과를 할당
+       - 우항은 배열 [10, 20, 30]에 map 메서드 호출
+       - 첫번째 매개변수로 익명함수 전달
+      > **map 메서드 동작 방식**
+      > `Array.prototype.map(callback[, thisArg])`
+      > `callback: function(currentValue, index, array)`
+      > - 첫번째 인자 : callback 함수
+      > - 두번째 인자 : 생략 가능함, 콜백 함수 내부에서 this로 인식할 대상을 특정
+      > - 배열의 모든 요소들을 하나씩 꺼내어 `콜백 함수를 반복 호출하고 실행` 결과들을 모아 새로운 배열을 만듦
+      > - 콜백 함수의 `첫번째 인자` = 배열의 요소 중 `현재 값`, `두번째 인자` = 현재값의 `인덱스`, `세번째 인자` = map 메서드의 `대상이 되는 배열 자체`가 담김
+
+<br>
+
+- 콜백함수 예제 : Array.prototype.map - 인자의 순서를 임의로 바꾸어 사용한 경우
+  ```js
+  // 잘못된 매개변수 순서를 가진 map 함수 예제
+  var newArr2 = [10, 20, 30].map(function (index, currentValue) {
+    console.log(index, currentValue);
+    return currentValue + 5;
+  });
+
+  console.log(newArr2);
+
+  // -- 실행 결과 --
+  // 10 0
+  // 20 1
+  // 30 2
+  //  [5, 6, 7]
+
+  ```
+  - 사람은 이름을 통해 인지하여 순서가 바뀌더라도 괜찮을거라고 생각하지만 컴퓨터는 순서를 통해 구분하여 원하는 값이 나오지 않음
+  - `currentValue`의 위치가 `두번째라 인덱스 값`을 더하게 됨
+
+<br>
+
+- 이처럼 `콜백 함수의 제어권을 넘겨받은 코드`는 콜백 함수를 호출할 때 `인자에 어떤 값들을 어떤 순서로 넘길 것인지에 대해 제어권을 가짐`
+
+### 2-3. this
+- 콜백 함수 예제 : Array.prototype.map - map 메서드 직접 구현
+  ```js
+  Array.prototype.map = function (callback, thisArg) {
+    var mappedArr = [];
+
+    for (var i = 0; i < this.length; i++) {
+      var mappedValue = callback.call(thisArg || window, this[i], i, this);
+      mappedArr[i] = mappedValue;
+    }
+
+    return mappedArr;
+  };
+
+  ```
+  - this에는 thisArg 값이 있을 경우 그 값을 지정하고 없으면 전역객체를 지정
+  - `call/apply 메서드`는 콜백 함수에 this 값을 명시적으로 지정해서 실행하는 메서드
+  - `첫번째` 인자 : 메서드의 this가 배열을 가르킬 것이므로 배열의 i번째 요소 값
+  - `두번째` 인자 : i 값
+  - `세번째` 인자 : 배열 자체
+  - `결과` : mappedValue에 담겨 mappedArr의 i번째 인자에 할당
+  - 제어권을 넘겨받을 코드에서 `call/apply 메서드의 첫번째 인자`에 콜백 함수 내부에서 this가 될 대상을 명시적 바인딩
+  
+<br>
+
+- 예시 : 콜백 함수 내부에서의 this
+  ```js
+  // (1) setTimeout 내부의 this는 window
+  setTimeout(function () {
+    console.log('(1)', this); 
+  }, 300); // (1) Window { ...}
+
+  // (2) forEach 콜백 내부의 this는 undefined (strict mode) 또는 window
+  [1, 2, 3, 4, 5].forEach(function (x) {
+    console.log(this); 
+    // (2) Window { ... }
+  });
+
+  // (3) 이벤트 리스너 내부의 this는 해당 DOM 요소
+  document.body.innerHTML += '<button id="a">클릭</button>';
+
+  document.querySelector('#a')
+    .addEventListener('click', function (e) {
+      console.log(this, e);
+      // (3) <button id="a">클릭</button>
+      // MouseEvent { isTrusted: true, ... }
+    });
+  ```
+  - (1) `setTimeout` 내부에서 콜백 함수 호출 => call 메서드의 첫번째 인자에 전역객체를 넘김
+    - 콜백 함수 내부에서의 this가 전역객체를 가르킴
+
+  - (2) `forEach`는 별도의 인자로 this를 받는 경우 해당에 해당하지만 별도의 this를 넘겨주지 않아 전역객체를 가르킴
+
+  - (3) `addEventListener`는 내부에서 콜백 함수를 호출할 때 call 메서드의 첫번째 인자에 `addEventListener` 메서드의 this를 그대로 넘기게 정의되어있음
+    - 콜백 함수 내부에서의 this가 `addEventListener`를 호출한 주체인 `HTML` 엘리먼트를 가르킴
+
+
+## 3. 콜백 함수는 함수다
