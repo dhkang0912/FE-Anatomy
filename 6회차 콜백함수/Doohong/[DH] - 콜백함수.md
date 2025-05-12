@@ -5,6 +5,7 @@
     - [2-2. 인자](#2-2-인자)
     - [2-3. this](#2-3-this)
   - [3. 콜백 함수는 함수다](#3-콜백-함수는-함수다)
+  - [4. 콜백 함수 내부의 this에 다른 값 바인딩하기](#4-콜백-함수-내부의-this에-다른-값-바인딩하기)
 
 # 콜백함수
 ## 1. 콜백 함수란?
@@ -209,3 +210,119 @@
 
 
 ## 3. 콜백 함수는 함수다
+- 콜백 함수로 어떤 객체의 메서드를 전달해도 `메서드가 아닌 함수로서 호출이 됨`
+
+<br>
+
+- 예시 :  메서드를 콜백 함수로 전달한 경우
+  ```js
+  var obj = {
+    vals: [1, 2, 3],
+    logValues: function (v, i) {
+      console.log(this, v, i);
+    }
+  };
+
+  // 직접 호출: this는 obj
+  obj.logValues(1, 2); 
+  // 출력: { vals: [1, 2, 3], logValues: f } 1 2
+
+  // forEach에 메서드 전달: this는 window (또는 undefined in strict mode)
+  [4, 5, 6].forEach(obj.logValues);
+  // 출력 (예시):
+  // Window { ... } 4 0
+  // Window { ... } 5 1
+  // Window { ... } 6 2
+
+  ```
+  - obj 객체의 logValues는 메서드로 정의
+  -  점 표기법으로 메서드로서 호출
+  -  이후 forEach 함수의 콜백 함수로 메서드 전달
+     - obj를 this로 하는 메서드를 그대로 전달한 것이 아님
+     - obj.logValues가 가리키는 `함수만 전달`  
+      => `this` = 전역 객체
+
+## 4. 콜백 함수 내부의 this에 다른 값 바인딩하기
+- **예시** :  콜백 함수 내부의 this에 다른 값을 바인딩하는 방법(1) - 전통적인 방식
+  ```js
+  var obj1 = {
+    name: 'obj1',
+    func: function () {
+      var self = this; // this를 self에 저장
+      return function () {
+        console.log(self.name); // self는 obj1을 참조
+      };
+    }
+  };
+
+  var callback = obj1.func();
+  setTimeout(callback, 1000); // 1초 후 'obj1' 출력
+
+  ```
+  - obj1, func 메서드 내부에서 `self 변수에 this를 담음`
+  - `setTimeout` 함수에 인자로 콜백함수를 넣음 => 1초 뒤 콜백 실행하며 `obj1` 출력  
+  => 번거롭고 실제 this를 쓰지 않음
+
+<br>
+
+- **예시** : 콜백 함수 내부에서 this를 사용하지 않은 경우
+  ```js
+  var obj1 = {
+    name: 'obj1',
+    func: function () {
+      console.log(obj1.name);
+    }
+  };
+
+  setTimeout(obj1.func, 1000); // 'obj1'
+
+  ```
+  - this를 사용하지 않아 간결하고 직관적이지만 다양한 상황에 this를 재활용할 수 없음
+
+<br>
+
+- **예시** : func 함수 재활용
+  ```js
+  var obj1 = {
+    name: 'obj1',
+    func: function () {
+      return function () {
+        console.log(this.name);
+      };
+    }
+  };
+
+  var obj2 = {
+    name: 'obj2',
+    func: obj1.func
+  };
+
+  var callback2 = obj2.func();        // 내부에서 this는 obj2 → 리턴된 함수 안의 this는 전역
+  setTimeout(callback2, 1500);        // undefined (또는 window.name)
+
+  var obj3 = { name: 'obj3' };
+  var callback3 = obj1.func.call(obj3); // this를 obj3로 명시 바인딩
+  setTimeout(callback3, 2000);          // undefined (또는 window.name)
+
+  ```
+  - `callback2` : 이게 맞아...? 이건 확인 필요
+  - `callback3` : 명시적 바인딩을 통해 `this` 설정
+
+<br>
+
+- **예시** : 콜백 함수 내부의 this에 다른 값을 바인딩하는 방법(2) - bind 메서드 활용
+  ```js
+  var obj1 = {
+    name: 'obj1',
+    func: function () {
+      console.log(this.name);
+    }
+  };
+
+  setTimeout(obj1.func.bind(obj1), 1000); // 1초 후 'obj1' 출력
+
+  var obj2 = { name: 'obj2' };
+  setTimeout(obj1.func.bind(obj2), 1500); // 1.5초 후 'obj2' 출력
+
+  ```
+  - ES5의 `bind 메서드` 활용하여 this 바인딩
