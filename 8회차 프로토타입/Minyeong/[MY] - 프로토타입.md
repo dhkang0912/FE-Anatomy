@@ -326,5 +326,33 @@ console.log(g);   // Grade(2) [100, 90]
     - 객체 전용 메서드는 Object 생성자 함수에 정적으로 담김
   - 프로토타입 체인은 무한대의 단계로 생성 가능
 
+---
 # Q&A
 
+**1. 자바스크립트는 클래스 기반 언어가 아닌데, 상속은 어떻게 이루어지나요?**  
+자바스크립트는 프로토타입 기반 언어입니다.  
+클래스처럼 보이지만 실제로는 어떤 객체를 원형으로 삼아 참조하는 방식으로 상속이 이루어집니다.  
+객체가 생성될 때 __proto__라는 내부 링크가 자동으로 연결되는데, 이게 생성자 함수의 prototype 객체를 참조합니다.  
+그래서 인스턴스는 prototype에 정의된 메서드에 접근할 수 있고, 마치 상속처럼 동작합니다.
+
+**2. __proto__와 prototype의 차이를 설명해주세요.**  
+prototype은 생성자 함수에 자동으로 붙는 속성으로, 인스턴스들이 공통으로 사용할 메서드를 정의하는 곳입니다.  
+반면 __proto__는 모든 객체가 가지는 내부 링크로, 그 객체의 부모 프로토타입을 가리킵니다.  
+즉, instance.__proto__ === Constructor.prototype 관계가 항상 성립하고 이 연결을 통해 프로토타입 체이닝이 동작하게 됩니다.
+
+**3. instanceof는 내부적으로 어떤 식으로 작동하나요?**  
+instanceof는 인스턴스의 __proto__ 체인을 따라 올라가며 그 경로 중 하나라도 우변 생성자 함수의 prototype과 일치하면 true를 반환합니다.  
+즉, obj instanceof Constructor는
+obj.__proto__ === Constructor.prototype || obj.__proto__.__proto__ === Constructor.prototype ...
+이런 식으로 확인합니다.
+그래서 단순히 obj.constructor = OtherConstructor로 속성을 바꾸더라도 instanceof OtherConstructor는 여전히 false입니다.
+
+**4.자바스크립트에서 배열처럼 보이지만 배열이 아닌 객체를 만들면 어떻게 되나요?**  
+유사배열객체는 push, map 같은 배열 메서드를 상속받지 못하기 때문에
+prototype을 Array 인스턴스로 설정하거나 call/apply로 메서드를 빌려 써야 합니다.
+
+**5. Object의 정적 메서드와 prototype 메서드의 차이를 설명해주세요.**  
+Object의 정적 메서드는 일반 객체의 __proto__를 통해 접근할 수 없고, 직접 Object.freeze(obj)처럼 호출해야 합니다.  
+반면 prototype 메서드는 Object.prototype에 정의되어 있어 모든 객체가 상속을 통해 직접 호출할 수 있습니다.  
+즉, 정적 메서드는 대상 객체를 인자로 받고,
+프로토타입 메서드는 this를 기준으로 동작하는 차이가 있습니다.
