@@ -80,6 +80,7 @@ suzi.__proto__.getName();
   - 1)의 this = suzi.`__proto__`
     - 이 객체 내부에는 name 프로퍼티 없음
     - 찾고자 하는 식별자 없으므로 undefined 반환
+    - 생성자 함수는 그냥 생성자!
   - 2)의 this = suzi
     - suzi 객체에는 getName 없음
     - 프로토타입 체인으로 인해 suzi.`__proto__`의 getName 찾음
@@ -112,8 +113,8 @@ console.dic(Array);
 - prototype 객체 내부, `__proto__` 객체 내부엔 constructor 프로퍼티 존재
 - 원래의 생성자 함수(자기 자신) 참조
 - 인스턴스로부터 그 원형이 무엇인지 알 수 있는 수단
-- 읽기 전용 속성이 부여된 예외 경우(number, string, boolean) 제외하고 값을 바꿀 수 있음
-
+- 읽기 전용 속성이 부여된 예외 경우(기본형 - number, string, boolean) 제외하고 값을 바꿀 수 있음
+  - 기본형의 경우 자바스크립트는 필요할 때 자동으로 임시 객체로 바꾸기 때문에 contructor를 확인 가능
 *constructor 프로퍼티*
 ```js
 var arr = [1, 2];
@@ -209,7 +210,7 @@ console.log(iu.getName()); // 바로 지금
       console.log(iu.__proto__.getName()); // ❌ undefined
       
       Person.prototype.name = '지금';
-      console.log(iu.__proto__.getName()); // '지금금'
+      console.log(iu.__proto__.getName()); // '지금'
 
       console.log(iu.__proto__.getName.call(iu)); // '지금'
       ```
@@ -217,13 +218,13 @@ console.log(iu.getName()); // 바로 지금
 - 프로토타입 체인 : 어떤 데이터의 `__proto__` 프로퍼티 내부에서 다시 `__proto__`프로퍼티가 연쇄적으로 이어진 것
 - 프로토타입 체이닝 : 프로토타입 체인을 따라가며 검색하는 것, 메서드 오버라이드와 동일한 맥락
 
-*배열의 내부 구조와 내부 도식*
+*배열의 내부 구조와 내부 도식*  
 ![alt text](06/배열내부구조.png)
 - `__proto__`의 constructor : Object()
   - prototype가 객체이기 때문
   - 기본적으로 모든 객체의 `__proto__`에는 Object.prototype 연결
 
-![alt text](image.png)
+![alt text](06/배열의내부도식.png)
 - 배열 뿐만 아닌 자바스크립트 데이터는 이러한 프로토타입 체인 구조 지님
 - 각 생성자 함수는 모두 함수이기 때문에 Function 생성자 함수의 prototype과 연결되고 재귀적으로 반복해 사용자가 접근하고자 하는 정보를 얻을 수 있음
 
@@ -292,6 +293,7 @@ var Grade = function () {
   this.length = args.length;
 };
 var g = new Grade(100, 80); // g = {0: 100, 1: 80, length: 2}
+g.__proto__ = [];
 ```
 - g는 유사 배열 객체
   - 배열 메서드 사용 불가
