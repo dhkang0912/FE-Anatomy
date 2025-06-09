@@ -1,6 +1,7 @@
 # Chapter 7. 클래스
 - [Chapter 7. 클래스](#chapter-7-클래스)
   - [7-1. 클래스와 인스턴스의 개념 이해](#7-1-클래스와-인스턴스의-개념-이해)
+  - [7-2. 자바스크립트의 클래스](#7-2-자바스크립트의-클래스)
 
 > 👀 **들어가기 전**
 >
@@ -42,3 +43,54 @@
     - 차이점
       - 현실 - 인스턴스들로부터 공통점 발견해 클래스 정의(추상적 개념)
       - 프로그래밍 - 클래스가 먼저 정의되어야만 그로부터 공통적인 요소 지니는 개체 생성 가능(추상적인 대상일 수도, 구체적인 개체일 수도 있음)
+
+## 7-2. 자바스크립트의 클래스
+- 생성자 함수를 호출하면 인스턴스 생성
+  - 생성자 함수 = 일종의 클래스
+  - 생성자 함수.prototype 객체 내부 요소 = 인스턴스에 상속
+    - 프로토타입 체이닝에 의한 참조이나 결과적으론 상속과 동일하게 동작
+    - 인스턴스에 상속(참조)되는지 여부에 따라 static member와 prototype method(instance member)로 나뉨
+  ![alt text](07/프로토타입에클래스개념적용.png)
+
+*클래스 관점에서 바라본 프로토타입 시스템 예시*
+```js
+// 생성자
+var Rectangle = function (width, height) {
+  this.width = width;
+  this.height = height;
+};
+
+// (프로토타입) 메서드
+Rectangle.prototye.getArea = function () {
+  return this.width * this.height;
+};
+
+// 스태틱 메서드
+Rectangle.isRectangle = function (instance) {
+  return instance instanceof Rectangle && 
+    instance.with > 0 && instance.height > 0;
+}
+
+var rect1 = new Rectangle(3, 4)
+console.log(rect1.getArea()); // 12 (O)
+console.log(rect1.isRectangle(rect1)); // Error (X)
+console.log(Rectangle.isRectangle(rect1)); // true
+```
+- 프로토타입 메서드
+  - `rect1.getArea()`
+    - `rect1.(__proto__).getArea()`
+    - this = rect1
+  - 인스턴스에서 직접 호출할 수 있는 메서드
+- 스태틱 메서드
+  - `rect1.isRectangle(rect1)`
+    - rect1 (X) → rect1.`__proto__` (X) → rect1.`__proto__.__proto__`(= Object.prototype) (X)
+    - Uncaught TypeError : not a function
+  - 인스턴스에서 직접 접근할 수 없는 메서드
+  - 생성자 함수를 this로 해야만 호출 가능
+
+![alt text](07/인스턴스에서직접접근여부.png)  
+
+
+> 🤔 **자바스크립트에서의 클래스는?**
+> - 구체적인 인스턴스가 사용할 메서드를 정의한 '틀'의 역할을 담당하는 목적 => **추상적 개념**
+> - 클래스 자체를 this로 해 직접 접근해야만 하는 스태틱 메서드를 호출할 때의 클래스 => **하나의 개체**로 취급
